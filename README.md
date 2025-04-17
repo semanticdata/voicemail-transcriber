@@ -25,7 +25,7 @@ A simple web application that transcribes MP3 voicemail files to text using spee
 
 ## Usage
 
-1. Start the application:
+1. Start the application (use `python -m` if you encounter _Failed to canonicalize script path_ error):
 
    ```bash
    streamlit run main.py
