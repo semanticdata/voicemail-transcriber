@@ -8,6 +8,7 @@ from datetime import datetime
 # ----------------------------
 # Configuration
 # ----------------------------
+
 st.set_page_config(
     page_title="Voicemail Transcriber", page_icon="🎤", layout="centered"
 )
@@ -51,6 +52,7 @@ def save_uploaded_file(uploaded_file) -> str:
 # ----------------------------
 # Session State Initialization
 # ----------------------------
+
 st.session_state.setdefault("transcription_history", [])
 st.session_state.setdefault("current_transcription", None)
 
@@ -81,8 +83,11 @@ if uploaded_file:
 if st.session_state.current_transcription:
     with st.form("metadata_form"):
         st.subheader("🗂️ Transcription Metadata")
-        title = st.text_input("Title", placeholder="E.g., 'Call from customer'")
-        address = st.text_input("Address", placeholder="E.g., 123 Main St, City")
+        caller = st.text_input("Caller", placeholder="E.g., John Doe")
+        address = st.text_input(
+            "Address", placeholder="E.g., 4141 Douglas Dr N, Crystal"
+        )
+        phone = st.text_input("Phone", placeholder="E.g., 'Call from Resident'")
         note = st.text_area("Notes", placeholder="Optional notes...")
 
         st.subheader("🧾 Transcription Output")
@@ -92,9 +97,10 @@ if st.session_state.current_transcription:
             st.session_state.transcription_history.append(
                 {
                     "filename": uploaded_file.name,
-                    "title": title,
                     "address": address,
+                    "phone": phone,
                     "note": note,
+                    "caller": caller,
                     "transcription": st.session_state.current_transcription,
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 }
@@ -110,19 +116,20 @@ if st.session_state.current_transcription:
 st.sidebar.title("🕘 Transcription History")
 
 if st.session_state.transcription_history:
-    if st.sidebar.button("🗑️ Clear History"):
-        st.session_state.transcription_history.clear()
-        st.rerun()
-
     for entry in reversed(st.session_state.transcription_history):
-        label = entry.get("title") or entry["filename"]
+        label = entry.get("address") or entry["filename"]
         with st.sidebar.expander(f"📝 {label}"):
-            st.markdown(f"**Title:** {entry.get('title', '—')}")
+            st.markdown(f"**Caller:** {entry.get('caller', '—')}")
             st.markdown(f"**Address:** {entry.get('address', '—')}")
+            st.markdown(f"**Phone:** {entry.get('phone', '—')}")
             if entry.get("note"):
                 st.markdown(f"**Notes:** {entry['note']}")
             st.markdown(f"**Timestamp:** {entry['timestamp']}")
             st.markdown("**Transcription:**")
             st.write(entry["transcription"])
+
+    if st.sidebar.button("🗑️ Clear History"):
+        st.session_state.transcription_history.clear()
+        st.rerun()
 else:
     st.sidebar.write("No transcriptions yet.")
