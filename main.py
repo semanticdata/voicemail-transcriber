@@ -41,7 +41,7 @@ def transcribe_audio(audio_file):
 
 
 # Initialize session state for transcription history
-if 'transcription_history' not in st.session_state:
+if "transcription_history" not in st.session_state:
     st.session_state.transcription_history = []
 
 # Streamlit UI
@@ -62,8 +62,12 @@ if uploaded_file is not None:
     # Display audio player
     st.audio(uploaded_file)
 
-    # Add transcribe button
-    if st.button("Transcribe Audio"):
+    # Add transcribe button and form
+    transcribe_button = st.button("Transcribe Audio")
+    if "current_transcription" not in st.session_state:
+        st.session_state.current_transcription = None
+
+    if transcribe_button:
         mp3_path = None
         try:
             # Create a temporary file to save the uploaded MP3
@@ -73,18 +77,8 @@ if uploaded_file is not None:
 
             with st.spinner("Transcribing..."):
                 # Get transcription
-                transcription = transcribe_audio(mp3_path)
+                st.session_state.current_transcription = transcribe_audio(mp3_path)
 
-                # Add to history
-                st.session_state.transcription_history.append({
-                    'filename': uploaded_file.name,
-                    'transcription': transcription,
-                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                })
-
-                # Display results
-                st.subheader("Transcription Result:")
-                st.write(transcription)
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
         finally:
@@ -95,15 +89,48 @@ if uploaded_file is not None:
                 except Exception:
                     pass
 
+    # Add metadata form
+    if st.session_state.current_transcription is not None:
+        with st.form(key="metadata_form"):
+            st.write("Add metadata for this transcription:")
+            title = st.text_input(
+                "Title", placeholder="Enter a title for this transcription"
+            )
+            address = st.text_input("Address", placeholder="Enter the address")
+            note = st.text_area("Notes", placeholder="Add any additional notes")
+            st.write("Transcription:")
+            st.write(st.session_state.current_transcription)
+            submit_button = st.form_submit_button("Save Transcription")
+
+            if submit_button:
+                # Add to history with metadata
+                st.session_state.transcription_history.append(
+                    {
+                        "filename": uploaded_file.name,
+                        "title": title,
+                        "address": address,
+                        "note": note,
+                        "transcription": st.session_state.current_transcription,
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                )
+                st.session_state.current_transcription = None
+                st.success("Transcription saved successfully!")
+                st.rerun()
+
 # Display transcription history
 st.sidebar.title("Transcription History")
 if len(st.session_state.transcription_history) > 0:
     if st.sidebar.button("Clear History"):
         st.session_state.transcription_history = []
         st.rerun()
-    
+
     for idx, entry in enumerate(reversed(st.session_state.transcription_history)):
-        with st.sidebar.expander(f"📝 {entry['filename']}"):
+        with st.sidebar.expander(f"📝 {entry.get('title', entry['filename'])}"):
+            st.write(f"**Title:** {entry.get('title', 'No title')}")
+            st.write(f"**Address:** {entry.get('address', 'No address')}")
+            if entry.get("note"):
+                st.write(f"**Notes:** {entry['note']}")
             st.write(f"**Timestamp:** {entry['timestamp']}")
             st.write(f"**Transcription:**\n{entry['transcription']}")
 else:
