@@ -1,6 +1,15 @@
 # Voicemail Transcriber
 
-A simple web application that transcribes MP3 voicemail files to text using speech recognition technology.
+A simple web application that transcribes MP3 voicemail files to text using speech recognition technology, with features for metadata management and transcription history.
+
+## Features
+
+- MP3 voicemail file transcription
+- Audio playback support
+- Metadata capture (caller, address, phone, notes)
+- Transcription history management
+- Export transcriptions as text files
+- Clean and intuitive user interface
 
 ## Requirements
 
@@ -33,15 +42,21 @@ A simple web application that transcribes MP3 voicemail files to text using spee
 
 2. Open your web browser and navigate to the provided URL
 3. Upload an MP3 file using the file uploader
-4. Wait for the transcription process to complete
-5. View the transcribed text
+4. Click "Transcribe Audio" to process the voicemail
+5. Fill in the metadata form (caller, address, phone, notes)
+6. Save the transcription to add it to your history
+7. Access saved transcriptions in the sidebar
+8. Download transcriptions as text files for record keeping
 
 ## How It Works
 
 The application:
 
 1. Accepts MP3 file uploads
-2. Converts MP3 to WAV format temporarily
-3. Uses Google Speech Recognition API for transcription
-4. Displays the transcribed text
-5. Automatically cleans up temporary files
+2. Provides audio playback functionality
+3. Converts MP3 to WAV format temporarily
+4. Uses Google Speech Recognition API for transcription
+5. Captures and stores metadata with transcriptions
+6. Maintains a history of all transcriptions
+7. Enables text file exports of transcriptions with metadata
+8. Automatically cleans up temporary files
