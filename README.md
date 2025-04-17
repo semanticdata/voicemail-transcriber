@@ -10,6 +10,9 @@ A simple web application that transcribes MP3 voicemail files to text using spee
   - pydub (>=0.25.1)
   - speechrecognition (>=3.14.2)
   - streamlit (for web interface)
+- External dependencies:
+  - Google Speech Recognition API (requires internet connection)
+  - ffmpeg (for audio conversion)
 
 ## Installation
 
@@ -42,7 +45,3 @@ The application:
 3. Uses Google Speech Recognition API for transcription
 4. Displays the transcribed text
 5. Automatically cleans up temporary files
-
-## Note
-
-Internet connection is required for the speech recognition service to work.
