@@ -5,6 +5,7 @@ import tempfile
 import os
 
 
+@st.cache_data
 def transcribe_audio(audio_file):
     # Create a recognizer instance
     recognizer = sr.Recognizer()
@@ -40,32 +41,37 @@ def transcribe_audio(audio_file):
 
 # Streamlit UI
 st.title("Voicemail Transcriber")
-st.write("Upload an MP3 file to get its transcription")
+st.write("Upload an MP3 file to play and transcribe it")
 
 # File uploader
 uploaded_file = st.file_uploader("Choose an MP3 file", type=["mp3"])
 
 if uploaded_file is not None:
-    mp3_path = None
-    try:
-        # Create a temporary file to save the uploaded MP3
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_mp3:
-            mp3_path = temp_mp3.name
-            temp_mp3.write(uploaded_file.getvalue())
+    # Display audio player
+    st.audio(uploaded_file)
 
-        with st.spinner("Transcribing..."):
-            # Get transcription
-            transcription = transcribe_audio(mp3_path)
+    # Add transcribe button
+    if st.button("Transcribe Audio"):
+        mp3_path = None
+        try:
+            # Create a temporary file to save the uploaded MP3
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_mp3:
+                mp3_path = temp_mp3.name
+                temp_mp3.write(uploaded_file.getvalue())
 
-            # Display results
-            st.subheader("Transcription Result:")
-            st.write(transcription)
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
-    finally:
-        # Clean up temporary file
-        if mp3_path and os.path.exists(mp3_path):
-            try:
-                os.unlink(mp3_path)
-            except Exception:
-                pass
+            with st.spinner("Transcribing..."):
+                # Get transcription
+                transcription = transcribe_audio(mp3_path)
+
+                # Display results
+                st.subheader("Transcription Result:")
+                st.write(transcription)
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+        finally:
+            # Clean up temporary file
+            if mp3_path and os.path.exists(mp3_path):
+                try:
+                    os.unlink(mp3_path)
+                except Exception:
+                    pass
