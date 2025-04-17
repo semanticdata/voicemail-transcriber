@@ -40,6 +40,13 @@ def transcribe_audio(audio_file):
 
 
 # Streamlit UI
+st.set_page_config(
+    page_title="Voicemail Transcriber",
+    page_icon="🎤",
+    layout="centered",
+    initial_sidebar_state="auto",
+    menu_items=None,
+)
 st.title("Voicemail Transcriber")
 st.write("Upload an MP3 file to play and transcribe it")
 
