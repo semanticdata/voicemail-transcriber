@@ -115,6 +115,32 @@ if st.session_state.current_transcription:
 
 st.sidebar.title("🕘 Transcription History")
 
+
+def export_transcription(entry: dict) -> str:
+    timestamp = entry["timestamp"].replace(":", "-")
+    caller = entry.get("caller", "Unknown")
+    filename = f"{timestamp}_{caller}.txt"
+
+    content = [
+        f"Voicemail Transcription Export",
+        f"============================",
+        f"",
+        f"Caller: {entry.get('caller', '—')}",
+        f"Address: {entry.get('address', '—')}",
+        f"Phone: {entry.get('phone', '—')}",
+        f"Timestamp: {entry['timestamp']}",
+        f"Filename: {entry['filename']}",
+        f"",
+        f"Notes:",
+        f"{entry.get('note', '—')}",
+        f"",
+        f"Transcription:",
+        f"{entry['transcription']}",
+    ]
+
+    return "\n".join(content)
+
+
 if st.session_state.transcription_history:
     for entry in reversed(st.session_state.transcription_history):
         label = entry.get("address") or entry["filename"]
@@ -127,6 +153,18 @@ if st.session_state.transcription_history:
             st.markdown(f"**Timestamp:** {entry['timestamp']}")
             st.markdown("**Transcription:**")
             st.write(entry["transcription"])
+
+            timestamp = entry["timestamp"].replace(":", "-")
+            caller = entry.get("caller", "Unknown")
+            filename = f"{timestamp}_{caller}.txt"
+            content = export_transcription(entry)
+            st.download_button(
+                "📥 Download TXT",
+                data=content,
+                file_name=filename,
+                mime="text/plain",
+                key=f"download_{entry['timestamp']}",
+            )
 
     if st.sidebar.button("🗑️ Clear History"):
         st.session_state.transcription_history.clear()
