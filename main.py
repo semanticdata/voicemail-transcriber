@@ -3,6 +3,7 @@ import speech_recognition as sr
 from pydub import AudioSegment
 import tempfile
 import os
+from datetime import datetime
 
 
 @st.cache_data
@@ -39,6 +40,10 @@ def transcribe_audio(audio_file):
                 pass
 
 
+# Initialize session state for transcription history
+if 'transcription_history' not in st.session_state:
+    st.session_state.transcription_history = []
+
 # Streamlit UI
 st.set_page_config(
     page_title="Voicemail Transcriber",
@@ -70,6 +75,13 @@ if uploaded_file is not None:
                 # Get transcription
                 transcription = transcribe_audio(mp3_path)
 
+                # Add to history
+                st.session_state.transcription_history.append({
+                    'filename': uploaded_file.name,
+                    'transcription': transcription,
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                })
+
                 # Display results
                 st.subheader("Transcription Result:")
                 st.write(transcription)
@@ -82,3 +94,17 @@ if uploaded_file is not None:
                     os.unlink(mp3_path)
                 except Exception:
                     pass
+
+# Display transcription history
+st.sidebar.title("Transcription History")
+if len(st.session_state.transcription_history) > 0:
+    if st.sidebar.button("Clear History"):
+        st.session_state.transcription_history = []
+        st.rerun()
+    
+    for idx, entry in enumerate(reversed(st.session_state.transcription_history)):
+        with st.sidebar.expander(f"📝 {entry['filename']}"):
+            st.write(f"**Timestamp:** {entry['timestamp']}")
+            st.write(f"**Transcription:**\n{entry['transcription']}")
+else:
+    st.sidebar.write("No transcriptions yet.")
