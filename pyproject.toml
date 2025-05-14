@@ -1,12 +1,10 @@
 [project]
-name = "voicemail-transcriber"
+name = "vm-transcriber"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
-    "ffmpeg-python>=0.2.0",
-    "pydub>=0.25.1",
-    "speechrecognition>=3.14.2",
+    "openai-whisper>=20240930",
     "streamlit>=1.44.1",
 ]

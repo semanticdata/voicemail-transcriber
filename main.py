@@ -1,272 +1,249 @@
-import streamlit as st
-import speech_recognition as sr
-from pydub import AudioSegment
-import tempfile
 import os
-from datetime import datetime
 
-# ----------------------------
-# Configuration
-# ----------------------------
+os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
-st.set_page_config(
-    page_title="Voicemail Transcriber", page_icon="🎤", layout="centered"
+import sys
+import contextlib
+
+if sys.platform.startswith("win"):
+    import asyncio
+
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+import streamlit as st
+import whisper
+import tempfile
+
+st.set_page_config(page_title="Speech-to-Text Demo")
+st.title("🎤 Speech-to-Text Demo")
+st.markdown(
+    """
+    <style>
+        .stTooltipIcon div {
+            min-width: 100%;
+        }
+        .stFileUploader > div {
+            margin-block-start: 0.5rem;
+            border: 1px solid var(--in-content-box-border-color);
+            border-radius: 0.5rem;
+        }
+        .stForm button,
+        .stFileUploader section button {
+            width: 100%;
+        }
+        .stTooltipIcon div button {
+            width: 100%;
+            margin-block-start: 2.7rem;
+        }
+        .stHorizontalBlock {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--in-content-box-border-color);
+        }
+        .stForm {
+            # border: none;
+        }
+        .stForm .stHorizontalBlock {
+            border: none;
+            padding: 0;
+        }
+        audio {
+            border-radius: 8px;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
-st.title("🎤 Voicemail Transcriber")
-st.markdown("Upload an MP3 or WAV file to **play** and **transcribe** it.")
+# --- Constants ---
+MODEL_OPTIONS = {
+    "Tiny (~39MB)": "tiny",
+    "Base (~74MB)": "base",
+    "Small (~244MB)": "small",
+    "Medium (~769MB)": "medium",
+    "Large (~1.55GB)": "large",
+}
+LANGUAGES = {"English": "en", "Spanish": "es", "French": "fr"}
 
-# ----------------------------
-# Utility Functions
-# ----------------------------
+
+# --- Helper Functions ---
+def get_session_list(key):
+    """Get a list from session state, initializing if needed."""
+    if key not in st.session_state:
+        st.session_state[key] = []
+    return st.session_state[key]
 
 
-@st.cache_data
-def transcribe_audio(audio_path: str, file_type: str) -> str:
-    recognizer = sr.Recognizer()
+def get_session_value(key, default=None):
+    """Get a value from session state, initializing if needed."""
+    if key not in st.session_state:
+        st.session_state[key] = default
+    return st.session_state[key]
 
-    try:
-        st.write(f"Processing audio file: {audio_path}")
 
+def set_session_value(key, value):
+    """Set a value in session state."""
+    st.session_state[key] = value
+
+
+# --- UI Layout ---
+col1, col2 = st.columns([2, 2])
+with col1:
+    uploaded_file = st.file_uploader(
+        "Audio file",
+        type=["wav", "mp3", "m4a", "ogg", "flac", "webm"],
+        accept_multiple_files=False,
+    )
+with col2:
+    model_display = st.selectbox("Model", list(MODEL_OPTIONS.keys()), index=1)
+    model_choice = MODEL_OPTIONS[model_display]
+    language_display = st.selectbox("Language", list(LANGUAGES.keys()), index=0)
+    language_hint = LANGUAGES[language_display]
+    transcribe_clicked = st.button(
+        "Transcribe",
+        disabled=uploaded_file is None,
+        help="Upload an audio file to enable transcription.",
+    )
+
+
+# --- Caching ---
+@st.cache_resource(show_spinner=False)
+def get_whisper_model(model_choice):
+    """Load and cache the Whisper model by model_choice."""
+    return whisper.load_model(model_choice)
+
+
+@st.cache_data(show_spinner=False)
+def save_entry(entry):
+    """Save an annotated entry to session state."""
+    entries = get_session_list("entries")
+    entries.append(entry)
+    set_session_value("entries", entries)
+    return entries
+
+
+def entry_to_txt(entry):
+    """Format an entry as plain text for download."""
+    return (
+        f"Name: {entry['name']}\n"
+        f"Phone: {entry['phone']}\n"
+        f"Address: {entry['address']}\n"
+        f"Notes: {entry['notes']}\n---\nTranscription:\n{entry['transcription']}\n"
+    )
+
+
+# --- Main Logic ---
+if uploaded_file is not None:
+    # Save to a temp file for whisper
+    suffix = os.path.splitext(uploaded_file.name)[-1] or ".wav"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+        with contextlib.suppress(Exception):
+            tmp_file.write(uploaded_file.read())
+        tmp_path = tmp_file.name
+
+    # Manual transcription trigger
+    if transcribe_clicked:
         try:
-            # Load the audio file based on detected type
-            if file_type == "mp3":
-                audio = AudioSegment.from_mp3(audio_path)
-                st.write("Successfully loaded MP3 file")
+            st.toast(
+                f"Transcribing with model '{model_choice}'... This may take a while."
+            )
+        except AttributeError:
+            st.info(
+                f"Transcribing with model '{model_choice}'... This may take a while."
+            )
+        try:
+            model = get_whisper_model(model_choice)
+            result = model.transcribe(tmp_path)
+            try:
+                st.toast("Transcription complete!")
+            except AttributeError:
+                st.success("Transcription complete!")
+            set_session_value("transcription_text", result["text"])
+            set_session_value("name", "")
+            set_session_value("phone", "")
+            set_session_value("address", "")
+            set_session_value("notes", "")
+        except Exception as e:
+            error_msg = str(e)
+            if "not found; available models" in error_msg:
+                # Extract available models from the error message
+                available = error_msg.split("available models =", 1)[-1].strip()
+                st.error(
+                    f"The selected model '{model_choice}' was not found.\nAvailable models: {available}\nPlease select a valid model from the list."
+                )
             else:
-                # Try loading WAV with explicit codec first
-                try:
-                    audio = AudioSegment.from_file(
-                        audio_path, format="wav", codec="adpcm_ms"
-                    )
-                except:
-                    # Fallback to default WAV loading if not ADPCM
-                    audio = AudioSegment.from_wav(audio_path)
-                st.write("Successfully loaded WAV file")
-        except Exception as e:
-            st.error(f"Error loading audio file: {str(e)}")
-            return f"❗ Error loading audio file: {str(e)}"
+                st.error(f"An error occurred during transcription: {e}")
 
-        # Create temporary WAV file for speech recognition
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_wav:
-            wav_path = temp_wav.name
-            st.write(f"Converting to WAV format: {wav_path}")
-
-            try:
-                # Normalize audio format before export
-                audio = audio.set_channels(1)  # Convert to mono
-                audio = audio.set_frame_rate(44100)  # Set sample rate
-
-                # Export with explicit codec and format settings
-                audio.export(
-                    wav_path,
-                    format="wav",
-                    codec="pcm_s16le",  # Standard 16-bit PCM codec
-                    parameters=[
-                        "-ar",
-                        "44100",  # Standard sample rate
-                        "-ac",
-                        "1",  # Mono
-                    ],
-                )
-                st.write("Successfully converted and exported audio")
-            except Exception as e:
-                st.error(f"Error during audio conversion: {str(e)}")
-                if os.path.exists(wav_path):
-                    os.remove(wav_path)
-                return f"❗ Error during audio conversion: {str(e)}"
-
-            # Verify the converted file
-            if not os.path.exists(wav_path):
-                return "❗ Failed to create WAV file"
-
-            if os.path.getsize(wav_path) == 0:
-                os.remove(wav_path)
-                return "❗ Generated WAV file is empty"
-
-            st.write("Starting transcription...")
-            with sr.AudioFile(wav_path) as source:
-                audio_data = recognizer.record(source)
-                text = recognizer.recognize_google(audio_data)
-                st.write("Transcription completed successfully")
-                return text
-    except sr.UnknownValueError:
-        return "❗ Speech recognition could not understand the audio."
-    except sr.RequestError as e:
-        return f"❗ Could not request results from the recognition service: {e}"
-    except Exception as e:
-        st.error(f"Unexpected error during processing: {str(e)}")
-        return f"❗ Error processing audio: {str(e)}"
-    finally:
-        # Clean up temporary files
-        if "wav_path" in locals() and os.path.exists(wav_path):
-            try:
-                os.remove(wav_path)
-            except Exception as e:
-                st.error(f"Error cleaning up temporary file: {str(e)}")
-
-
-def save_uploaded_file(uploaded_file) -> tuple[str, str]:
-    """Save uploaded file and detect its true type. Returns (path, detected_type)"""
-    # First save the file with its original extension
-    extension = ".mp3" if uploaded_file.type == "audio/mp3" else ".wav"
-    with tempfile.NamedTemporaryFile(suffix=extension, delete=False) as temp_file:
-        temp_file.write(uploaded_file.getvalue())
-        temp_path = temp_file.name
-
-    # Try to detect the true file type
-    try:
-        # Try loading as MP3 first
-        AudioSegment.from_mp3(temp_path)
-        return temp_path, "mp3"
-    except:
-        try:
-            # If MP3 fails, try as WAV
-            audio = AudioSegment.from_file(temp_path, format="wav", codec="adpcm_ms")
-            # Convert to standard WAV format immediately to avoid encoding issues
-            with tempfile.NamedTemporaryFile(
-                suffix=".wav", delete=False
-            ) as standard_wav:
-                audio.export(
-                    standard_wav.name,
-                    format="wav",
-                    codec="pcm_s16le",  # Use standard PCM encoding
-                    parameters=[
-                        "-ar",
-                        "44100",  # Set sample rate
-                        "-ac",
-                        "1",  # Convert to mono
-                    ],
-                )
-                os.remove(temp_path)  # Remove the original file
-                return standard_wav.name, "wav"
-        except Exception as e:
-            st.error(f"Error processing WAV file: {str(e)}")
-            # If both fail, default to the original type
-            return temp_path, "mp3" if uploaded_file.type == "audio/mp3" else "wav"
-
-
-# ----------------------------
-# Session State Initialization
-# ----------------------------
-
-st.session_state.setdefault("transcription_history", [])
-st.session_state.setdefault("current_transcription", None)
-
-# ----------------------------
-# File Upload + Transcription
-# ----------------------------
-
-uploaded_file = st.file_uploader("Upload MP3 or WAV", type=["mp3", "wav"])
-
-if uploaded_file:
-    st.audio(uploaded_file, format=uploaded_file.type)
-
-    if st.button("📝 Transcribe Audio"):
-        with st.spinner("Transcribing..."):
-            try:
-                audio_path, detected_type = save_uploaded_file(uploaded_file)
-                st.session_state.current_transcription = transcribe_audio(
-                    audio_path, detected_type
-                )
-            except Exception as e:
-                st.error(f"Unexpected error: {e}")
-            finally:
-                if os.path.exists(audio_path):
-                    os.remove(audio_path)
-
-# ----------------------------
-# Metadata Form
-# ----------------------------
-
-if st.session_state.current_transcription:
-    with st.form("metadata_form"):
-        st.subheader("🗂️ Transcription Metadata")
-        caller = st.text_input("Caller", placeholder="E.g., John Doe")
-        address = st.text_input(
-            "Address", placeholder="E.g., 4141 Douglas Dr N, Crystal"
-        )
-        phone = st.text_input("Phone", placeholder="E.g., 'Call from Resident'")
-        note = st.text_area("Notes", placeholder="Optional notes...")
-
-        st.subheader("🧾 Transcription Output")
-        st.write(st.session_state.current_transcription)
-
-        if st.form_submit_button("💾 Save Transcription"):
-            st.session_state.transcription_history.append(
-                {
-                    "filename": uploaded_file.name,
-                    "address": address,
-                    "phone": phone,
-                    "note": note,
-                    "caller": caller,
-                    "transcription": st.session_state.current_transcription,
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                }
+    # Show annotation UI if transcription exists
+    transcription_text = st.session_state.get("transcription_text")
+    if transcription_text:
+        with st.form("annotation_form"):
+            st.subheader("Annotate this entry")
+            st.audio(uploaded_file, format=uploaded_file.type)
+            st.text_area(
+                "Transcription",
+                transcription_text,
+                height=200,
+                key="transcription",
+                disabled=False,
             )
-            st.session_state.current_transcription = None
-            st.success("✅ Transcription saved successfully.")
-            st.rerun()
+            name_col, phone_col = st.columns(2)
+            with name_col:
+                name_val = st.text_input(
+                    "Name", value=st.session_state.get("name", ""), key="name"
+                )
+            with phone_col:
+                phone_val = st.text_input(
+                    "Phone", value=st.session_state.get("phone", ""), key="phone"
+                )
+            address = st.text_input(
+                "Address", value=st.session_state.get("address", ""), key="address"
+            )
+            notes = st.text_area(
+                "Notes", value=st.session_state.get("notes", ""), key="notes"
+            )
+            col_save, col_download = st.columns([1, 1])
+            with col_save:
+                save_clicked = st.form_submit_button("Save Annotation")
+            with col_download:
+                download_clicked = st.form_submit_button("Download as .txt")
 
-# ----------------------------
-# Sidebar: History Display
-# ----------------------------
-
-st.sidebar.title("🕘 Transcription History")
-
-
-def export_transcription(entry: dict) -> str:
-    timestamp = entry["timestamp"].replace(":", "-")
-    caller = entry.get("caller", "Unknown")
-    filename = f"{timestamp}_{caller}.txt"
-
-    content = [
-        f"Voicemail Transcription Export",
-        f"============================",
-        f"",
-        f"Caller: {entry.get('caller', '—')}",
-        f"Address: {entry.get('address', '—')}",
-        f"Phone: {entry.get('phone', '—')}",
-        f"Timestamp: {entry['timestamp']}",
-        f"Filename: {entry['filename']}",
-        f"",
-        f"Notes:",
-        f"{entry.get('note', '—')}",
-        f"",
-        f"Transcription:",
-        f"{entry['transcription']}",
-    ]
-
-    return "\n".join(content)
-
-
-if st.session_state.transcription_history:
-    for entry in reversed(st.session_state.transcription_history):
-        label = entry.get("address") or entry["filename"]
-        with st.sidebar.expander(f"📝 {label}"):
-            st.markdown(f"**Caller:** {entry.get('caller', '—')}")
-            st.markdown(f"**Address:** {entry.get('address', '—')}")
-            st.markdown(f"**Phone:** {entry.get('phone', '—')}")
-            if entry.get("note"):
-                st.markdown(f"**Notes:** {entry['note']}")
-            st.markdown(f"**Timestamp:** {entry['timestamp']}")
-            st.markdown("**Transcription:**")
-            st.write(entry["transcription"])
-
-            timestamp = entry["timestamp"].replace(":", "-")
-            caller = entry.get("caller", "Unknown")
-            filename = f"{timestamp}_{caller}.txt"
-            content = export_transcription(entry)
+        entry = {
+            "name": name_val,
+            "phone": phone_val,
+            "address": address,
+            "notes": notes,
+            "transcription": transcription_text,
+        }
+        if save_clicked:
+            save_entry(entry)
+            st.success("Entry saved!")
+        if download_clicked:
+            txt = entry_to_txt(entry)
             st.download_button(
-                "📥 Download TXT",
-                data=content,
-                file_name=filename,
+                label="Download Annotated Entry",
+                data=txt,
+                file_name=f"transcription_{name_val or 'entry'}.txt",
                 mime="text/plain",
-                key=f"download_{entry['timestamp']}",
+                key="download_current_entry",
             )
 
-    if st.sidebar.button("🗑️ Clear History"):
-        st.session_state.transcription_history.clear()
-        st.rerun()
-else:
-    st.sidebar.write("No transcriptions yet.")
+    # Show saved entries in the sidebar
+    with st.sidebar:
+        st.subheader("📋 Saved Entries (this session)")
+        entries = st.session_state.get("entries", [])
+        if not entries:
+            st.info("No saved entries yet.")
+        for i, entry in enumerate(entries):
+            with st.expander(f"Entry {i + 1}: {entry['name'] or 'No Name'}"):
+                st.write(f"**Phone:** {entry['phone']}")
+                st.write(f"**Address:** {entry['address']}")
+                st.write(f"**Notes:** {entry['notes']}")
+                st.write(f"**Transcription:**\n{entry['transcription']}\n")
+                st.download_button(
+                    label="Download This Entry as .txt",
+                    data=entry_to_txt(entry),
+                    file_name=f"transcription_{entry['name'] or 'entry'}.txt",
+                    mime="text/plain",
+                    key=f"download_{i}",
+                )
