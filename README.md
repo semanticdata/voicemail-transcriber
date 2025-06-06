@@ -23,30 +23,14 @@ A simple web application that transcribes MP3 voicemail files to text using spee
   - Google Speech Recognition API (requires internet connection)
   - ffmpeg (for audio conversion)
 
-## Installation
-
-1. Clone the repository
-2. Install dependencies:
-
-   ```bash
-   pip install .
-   ```
-
 ## Usage
 
-1. Start the application (use `python -m` if you encounter _Failed to canonicalize script path_ error):
-
-   ```bash
-   streamlit run main.py
-   ```
-
-2. Open your web browser and navigate to the provided URL
-3. Upload an MP3 file using the file uploader
-4. Click "Transcribe Audio" to process the voicemail
-5. Fill in the metadata form (caller, address, phone, notes)
-6. Save the transcription to add it to your history
-7. Access saved transcriptions in the sidebar
-8. Download transcriptions as text files for record keeping
+1. Upload an MP3 file using the file uploader
+2. Click "Transcribe Audio" to process the voicemail
+3. Fill in the metadata form (caller, address, phone, notes)
+4. Save the transcription to add it to your history
+5. Access saved transcriptions in the sidebar
+6. Download transcriptions as text files for record keeping
 
 ## How It Works
 
