@@ -1,9 +1,10 @@
-import streamlit as st
-import speech_recognition as sr
-from pydub import AudioSegment
-import tempfile
 import os
+import tempfile
 from datetime import datetime
+
+import speech_recognition as sr
+import streamlit as st
+from pydub import AudioSegment
 
 # ----------------------------
 # Configuration
@@ -221,19 +222,19 @@ def export_transcription(entry: dict) -> str:
     filename = f"{timestamp}_{caller}.txt"
 
     content = [
-        f"Voicemail Transcription Export",
-        f"============================",
-        f"",
+        "Voicemail Transcription Export",
+        "============================",
+        "",
         f"Caller: {entry.get('caller', '—')}",
         f"Address: {entry.get('address', '—')}",
         f"Phone: {entry.get('phone', '—')}",
         f"Timestamp: {entry['timestamp']}",
         f"Filename: {entry['filename']}",
-        f"",
-        f"Notes:",
+        "",
+        "Notes:",
         f"{entry.get('note', '—')}",
-        f"",
-        f"Transcription:",
+        "",
+        "Transcription:",
         f"{entry['transcription']}",
     ]
 
